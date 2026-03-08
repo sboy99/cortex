@@ -10,8 +10,10 @@ services:
     restart: unless-stopped
     networks:
       - cortex-net
+      
 networks:
   cortex-net:
+    name: cortex-net
     driver: bridge
 
 volumes:
