@@ -3,9 +3,7 @@
 import os
 from typing import Any
 
-import structlog
-
-logger = structlog.get_logger()
+from .lib import logger
 
 MAX_CHARS = 8000  # Ollama context consideration
 DEFAULT_MODEL = "llama3.2"

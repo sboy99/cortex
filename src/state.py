@@ -5,9 +5,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-import structlog
-
-logger = structlog.get_logger()
+from .lib import logger
 
 DEFAULT_STATE_PATH = Path("data/state.json")
 

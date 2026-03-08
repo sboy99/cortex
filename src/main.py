@@ -7,26 +7,18 @@ import sys
 from datetime import datetime, timezone
 
 import discord
-import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 
 from .bot import collect_messages
 from .db import cleanup_old_summaries, get_last_n_daily_summaries, init_db, save_daily_summary
+from .lib import configure_logging, logger
 from .state import load_last_run, save_last_run
 from .summarizer import summarize_messages
 
 load_dotenv()
-
-structlog.configure(
-    processors=[
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.add_log_level,
-        structlog.processors.JSONRenderer(),
-    ]
-)
-logger = structlog.get_logger()
+configure_logging()
 
 DISCORD_TOKEN = os.environ.get("DISCORD_TOKEN")
 DISCORD_USER_ID = os.environ.get("DISCORD_USER_ID")

@@ -6,11 +6,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import discord
-import structlog
 
+from .lib import logger
 from .state import load_last_run
-
-logger = structlog.get_logger()
 
 RATE_LIMIT_DELAY = 0.25  # seconds between channel fetches
 MAX_MESSAGES_PER_CHANNEL = 500

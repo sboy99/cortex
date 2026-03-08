@@ -6,9 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import structlog
-
-logger = structlog.get_logger()
+from .lib import logger
 
 DEFAULT_DB_PATH = Path("data/summaries.db")
 RETENTION_DAYS = 7
