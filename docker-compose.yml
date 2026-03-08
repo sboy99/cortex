@@ -2,7 +2,7 @@ services:
   cortex-bot:
     build: .
     env_file: .env
-    container_name: cortex-bot
+    container_name: cortex
     environment:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
     volumes:
