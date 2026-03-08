@@ -1,0 +1,12 @@
+services:
+  cortex-bot:
+    build: .
+    env_file: .env
+    environment:
+      OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+    volumes:
+      - cortex-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  cortex-data:
