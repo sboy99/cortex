@@ -5,6 +5,9 @@ services:
     container_name: cortex
     environment:
       OLLAMA_HOST: ${OLLAMA_HOST:-http://host.docker.internal:11434}
+    # Linux: host.docker.internal is not defined by default
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - cortex-data:/app/data
     restart: unless-stopped
