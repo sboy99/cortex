@@ -86,3 +86,49 @@ If Cortex runs in Docker and cannot reach Ollama:
    docker exec cortex curl -s http://host.docker.internal:11434/api/tags
    ```
    A JSON response means Ollama is reachable.
+
+### Ollama as a systemd service (Linux, runs in background, survives reboot)
+
+If Ollama is not installed or you want a proper systemd service:
+
+1. **Install Ollama** (if needed):
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ```
+   This creates the `ollama` user and installs the systemd unit.
+
+2. **Stop any running Ollama** so port 11434 is free:
+   ```bash
+   sudo systemctl stop ollama
+   pkill ollama   # fallback if not managed by systemd
+   ```
+
+3. **Configure Ollama to listen on all interfaces** (required for Docker). Use an override file so updates do not overwrite your config:
+   ```bash
+   sudo mkdir -p /etc/systemd/system/ollama.service.d
+   printf '[Service]\nEnvironment="OLLAMA_HOST=0.0.0.0"\n' | sudo tee /etc/systemd/system/ollama.service.d/override.conf
+   ```
+
+4. **Reload, enable, and start**:
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable ollama
+   sudo systemctl start ollama
+   ```
+
+5. **Verify** — Ollama should listen on `0.0.0.0:11434`:
+   ```bash
+   ss -tlnp | grep 11434
+   # Expected: 0.0.0.0:11434 (not 127.0.0.1)
+   curl -s http://localhost:11434/api/tags
+   ```
+
+6. **Pull a model** (once):
+   ```bash
+   ollama pull llama3.2
+   ```
+
+Useful commands:
+- `sudo systemctl status ollama` — check status
+- `sudo systemctl restart ollama` — restart after config changes
+- `sudo journalctl -u ollama -f` — follow logs

@@ -17,6 +17,7 @@ from .db import (
     cleanup_old_summaries,
     get_last_n_daily_summaries,
     get_user_channel_preferences,
+    get_user_channel_preferences_for_dm,
     init_db,
     save_daily_summary,
     set_user_channel_preferences,
@@ -46,6 +47,7 @@ ASK_LOOKBACK_HOURS = int(os.environ.get("ASK_LOOKBACK_HOURS", "24"))
 intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
+intents.dm_messages = True  # Ensure DMs are received
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -176,7 +178,7 @@ async def subscribe_channels(
     """Persist selected channels for the requesting user."""
     if interaction.guild is None:
         await interaction.response.send_message(
-            "Use this command in a server text channel.",
+            "Use this in a server to pick channels. Once subscribed, you can use /update and /ask from DMs.",
             ephemeral=True,
         )
         return
@@ -211,19 +213,17 @@ async def subscribe_channels(
 @tree.command(name="update", description="Fetch latest updates from your selected channels and DM you.")
 async def get_personal_update(interaction: discord.Interaction) -> None:
     """Collect channel messages and DM a summary to the requester."""
-    if interaction.guild is None:
-        await interaction.response.send_message(
-            "Use this command in a server text channel.",
-            ephemeral=True,
-        )
-        return
-
     await interaction.response.defer(ephemeral=True, thinking=True)
     user = interaction.user
-    channel_ids = get_user_channel_preferences(user.id, interaction.guild.id)
+    guild = interaction.guild
+    channel_ids = (
+        get_user_channel_preferences_for_dm(user.id)
+        if guild is None
+        else get_user_channel_preferences(user.id, guild.id)
+    )
     if not channel_ids:
         await interaction.followup.send(
-            "No channels configured yet. Use `/subscribe` first.",
+            "No channels configured. Use /subscribe in a server first, then you can ask from DMs.",
             ephemeral=True,
         )
         return
@@ -242,26 +242,24 @@ async def get_personal_update(interaction: discord.Interaction) -> None:
         return
 
     await interaction.followup.send("Update sent to your DM.", ephemeral=True)
-    logger.info("personal update sent", user_id=user.id, guild_id=interaction.guild.id)
+    logger.info("personal update sent", user_id=user.id, guild_id=guild.id if guild else None)
 
 
 @tree.command(name="ask", description="Ask a question about your selected channels.")
 @app_commands.describe(question="Your question for the bot")
 async def ask_channel_question(interaction: discord.Interaction, question: str) -> None:
     """Answer a user question based on recent selected-channel messages."""
-    if interaction.guild is None:
-        await interaction.response.send_message(
-            "Use this command in a server text channel.",
-            ephemeral=True,
-        )
-        return
-
     await interaction.response.defer(ephemeral=True, thinking=True)
     user = interaction.user
-    channel_ids = get_user_channel_preferences(user.id, interaction.guild.id)
+    guild = interaction.guild
+    channel_ids = (
+        get_user_channel_preferences_for_dm(user.id)
+        if guild is None
+        else get_user_channel_preferences(user.id, guild.id)
+    )
     if not channel_ids:
         await interaction.followup.send(
-            "No channels configured yet. Use `/subscribe` first.",
+            "No channels configured. Use /subscribe in a server first, then you can ask from DMs.",
             ephemeral=True,
         )
         return
@@ -278,7 +276,48 @@ async def ask_channel_question(interaction: discord.Interaction, question: str) 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     payload = f"**Answer** ({stamp})\n\n**Question:** {question}\n\n{answer}"
     await _send_followup_chunks(interaction, payload, ephemeral=True)
-    logger.info("question answered", user_id=user.id, guild_id=interaction.guild.id)
+    logger.info("question answered", user_id=user.id, guild_id=guild.id if guild else None)
+
+
+@client.event
+async def on_message(message: discord.Message) -> None:
+    """Handle plain-text questions in DMs."""
+    if message.author.bot:
+        return
+    if message.guild is not None:
+        return
+
+    content = (message.content or "").strip()
+    if not content:
+        return
+
+    channel_ids = get_user_channel_preferences_for_dm(message.author.id)
+    if not channel_ids:
+        await message.channel.send(
+            "Subscribe to channels in a server first with /subscribe, then I can answer questions here."
+        )
+        return
+
+    since = datetime.now(timezone.utc) - timedelta(hours=ASK_LOOKBACK_HOURS)
+    context = await collect_messages_for_user(
+        client,
+        user_id=message.author.id,
+        channel_ids=channel_ids,
+        since=since,
+        update_checkpoints=False,
+    )
+    answer = answer_question(context, content)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    payload = f"**Answer** ({stamp})\n\n**Question:** {content}\n\n{answer}"
+
+    chunk_size = 1800
+    if len(payload) <= chunk_size:
+        await message.channel.send(payload)
+    else:
+        for i in range(0, len(payload), chunk_size):
+            await message.channel.send(payload[i : i + chunk_size])
+
+    logger.info("dm question answered", user_id=message.author.id)
 
 
 @client.event

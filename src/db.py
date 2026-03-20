@@ -151,6 +151,16 @@ def get_user_channel_preferences(user_id: int, guild_id: int) -> list[int]:
     return [int(r["channel_id"]) for r in rows]
 
 
+def get_user_channel_preferences_for_dm(user_id: int) -> list[int]:
+    """Return all channel IDs user has subscribed to across all guilds (for DM context)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT channel_id FROM user_channel_preferences WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+    return [int(r["channel_id"]) for r in rows]
+
+
 def _parse_iso_utc(ts: str) -> datetime:
     """Parse stored timestamp and coerce to timezone-aware UTC."""
     parsed = datetime.fromisoformat(ts.replace("Z", "+00:00"))
