@@ -125,6 +125,22 @@ async def _send_dm_text(user: discord.abc.User, text: str) -> None:
         await user.send(text[i : i + chunk_size])
 
 
+async def _send_followup_chunks(
+    interaction: discord.Interaction,
+    text: str,
+    *,
+    ephemeral: bool = True,
+) -> None:
+    """Send long content via interaction followups in Discord-safe chunks."""
+    chunk_size = 1800
+    if len(text) <= chunk_size:
+        await interaction.followup.send(text, ephemeral=ephemeral)
+        return
+
+    for i in range(0, len(text), chunk_size):
+        await interaction.followup.send(text[i : i + chunk_size], ephemeral=ephemeral)
+
+
 def _selected_channels(
     channel_1: discord.TextChannel,
     channel_2: discord.TextChannel | None,
@@ -261,16 +277,7 @@ async def ask_channel_question(interaction: discord.Interaction, question: str) 
     answer = answer_question(context, question)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     payload = f"**Answer** ({stamp})\n\n**Question:** {question}\n\n{answer}"
-    try:
-        await _send_dm_text(user, payload)
-    except discord.Forbidden:
-        await interaction.followup.send(
-            "I couldn't DM you. Please enable DMs from server members and try again.",
-            ephemeral=True,
-        )
-        return
-
-    await interaction.followup.send("Answer sent to your DM.", ephemeral=True)
+    await _send_followup_chunks(interaction, payload, ephemeral=True)
     logger.info("question answered", user_id=user.id, guild_id=interaction.guild.id)
 
 
