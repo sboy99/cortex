@@ -24,7 +24,7 @@ from .db import (
 )
 from .lib import configure_logging, logger
 from .state import load_last_run, save_last_run
-from .summarizer import answer_question, summarize_messages
+from .summarizer import answer_question_async, summarize_messages_async
 
 load_dotenv()
 configure_logging()
@@ -67,7 +67,7 @@ async def run_daily_summary() -> None:
 
     now_utc = datetime.now(timezone.utc)
     aggregated = await collect_messages(client)
-    summary = summarize_messages(aggregated)
+    summary = await summarize_messages_async(aggregated)
 
     try:
         await user.send(f"**Daily Summary** ({now_utc.strftime('%Y-%m-%d %H:%M UTC')})\n\n{summary}")
@@ -100,8 +100,8 @@ async def run_weekly_summary() -> None:
         f"**{date}**\n{text}" for date, text in reversed(rows)
     )
 
-    from .summarizer import summarize_messages
-    weekly = summarize_messages(
+    from .summarizer import summarize_messages_async
+    weekly = await summarize_messages_async(
         f"Weekly digest. Summarize these daily summaries into a concise weekly overview:\n\n{combined}"
     )
 
@@ -229,7 +229,7 @@ async def get_personal_update(interaction: discord.Interaction) -> None:
         return
 
     aggregated = await collect_messages_for_user(client, user.id, channel_ids)
-    summary = summarize_messages(aggregated)
+    summary = await summarize_messages_async(aggregated)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     payload = f"**Your Channel Update** ({stamp})\n\n{summary}"
     try:
@@ -272,7 +272,7 @@ async def ask_channel_question(interaction: discord.Interaction, question: str) 
         since=since,
         update_checkpoints=False,
     )
-    answer = answer_question(context, question)
+    answer = await answer_question_async(context, question)
     payload = answer
     await _send_followup_chunks(interaction, payload, ephemeral=True)
     logger.info("question answered", user_id=user.id, guild_id=guild.id if guild else None)
@@ -305,7 +305,7 @@ async def on_message(message: discord.Message) -> None:
         since=since,
         update_checkpoints=False,
     )
-    answer = answer_question(context, content)
+    answer = await answer_question_async(context, content)
     payload = answer
 
     chunk_size = 1800

@@ -1,9 +1,23 @@
 """Ollama integration for summarizing Discord messages."""
 
+import asyncio
 import os
+import time
 from typing import Any
 
 from .lib import logger
+
+# #region agent log
+def _debug_log(msg: str, data: dict) -> None:
+    try:
+        from pathlib import Path
+        log_path = Path(__file__).resolve().parent.parent / ".cursor" / "debug-b1f9ec.log"
+        with open(log_path, "a") as f:
+            import json
+            f.write(json.dumps({"sessionId":"b1f9ec","message":msg,"data":data,"timestamp":int(time.time()*1000)}) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 MAX_CHARS = 8000  # Ollama context consideration
 DEFAULT_MODEL = "llama3.2"
@@ -71,10 +85,17 @@ def answer_question(context_text: str, question: str) -> str:
         prompt = """You are a helpful Discord bot. The user sent you a message in a DM, but you don't have channel context to answer from. Respond in a friendly, natural way. Keep it short and conversational. If they're greeting you or making small talk, reply in kind. If they seem to be asking about channel updates, gently say you need them to run /update first or subscribe to channels in a server."""
         try:
             client = _get_client()
+            # #region agent log
+            _debug_log("answer_question empty-context: before client.chat", {"hypothesisId":"H1","branch":"empty_context"})
+            t0 = time.monotonic()
+            # #endregion
             response = client.chat(
                 model=model,
                 messages=[{"role": "user", "content": f"{prompt}\n\nUser message: {cleaned_question}"}],
             )
+            # #region agent log
+            _debug_log("answer_question empty-context: after client.chat", {"hypothesisId":"H1","duration_sec":round(time.monotonic()-t0,2)})
+            # #endregion
             answer = response.message.content
             if answer and answer.strip():
                 return answer.strip()
@@ -101,10 +122,17 @@ Context:
 
     try:
         client = _get_client()
+        # #region agent log
+        _debug_log("answer_question with-context: before client.chat", {"hypothesisId":"H1","branch":"with_context"})
+        t0 = time.monotonic()
+        # #endregion
         response = client.chat(
             model=model,
             messages=[{"role": "user", "content": prompt}],
         )
+        # #region agent log
+        _debug_log("answer_question with-context: after client.chat", {"hypothesisId":"H1","duration_sec":round(time.monotonic()-t0,2)})
+        # #endregion
         answer = response.message.content
         if not answer:
             return "Answer unavailable (empty response)."
@@ -112,3 +140,13 @@ Context:
     except Exception as e:
         logger.exception("ollama question answering failed", error=str(e))
         return "Answer unavailable due to an error. Check logs."
+
+
+async def answer_question_async(context_text: str, question: str) -> str:
+    """Async wrapper: run answer_question in a thread to avoid blocking the event loop."""
+    return await asyncio.to_thread(answer_question, context_text, question)
+
+
+async def summarize_messages_async(aggregated_text: str) -> str:
+    """Async wrapper: run summarize_messages in a thread to avoid blocking the event loop."""
+    return await asyncio.to_thread(summarize_messages, aggregated_text)
