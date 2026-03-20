@@ -297,23 +297,24 @@ async def on_message(message: discord.Message) -> None:
         )
         return
 
-    since = datetime.now(timezone.utc) - timedelta(hours=ASK_LOOKBACK_HOURS)
-    context = await collect_messages_for_user(
-        client,
-        user_id=message.author.id,
-        channel_ids=channel_ids,
-        since=since,
-        update_checkpoints=False,
-    )
-    answer = await answer_question_async(context, content)
-    payload = answer
+    async with message.channel.typing():
+        since = datetime.now(timezone.utc) - timedelta(hours=ASK_LOOKBACK_HOURS)
+        context = await collect_messages_for_user(
+            client,
+            user_id=message.author.id,
+            channel_ids=channel_ids,
+            since=since,
+            update_checkpoints=False,
+        )
+        answer = await answer_question_async(context, content)
+        payload = answer
 
-    chunk_size = 1800
-    if len(payload) <= chunk_size:
-        await message.channel.send(payload)
-    else:
-        for i in range(0, len(payload), chunk_size):
-            await message.channel.send(payload[i : i + chunk_size])
+        chunk_size = 1800
+        if len(payload) <= chunk_size:
+            await message.channel.send(payload)
+        else:
+            for i in range(0, len(payload), chunk_size):
+                await message.channel.send(payload[i : i + chunk_size])
 
     logger.info("dm question answered", user_id=message.author.id)
 
