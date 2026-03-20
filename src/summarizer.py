@@ -60,13 +60,27 @@ def answer_question(context_text: str, question: str) -> str:
     """
     Answer a user question from provided Discord context.
 
-    If context is empty, returns a clear fallback message.
+    If context is empty, responds in a friendly conversational way instead of an error.
     """
     cleaned_question = question.strip()
     if not cleaned_question:
         return "Please provide a non-empty question."
     if not context_text.strip():
-        return "I couldn't find recent channel messages to answer from. Try `/update` first."
+        # No channel context - respond naturally to greetings and casual messages
+        model = os.environ.get("OLLAMA_MODEL", DEFAULT_MODEL)
+        prompt = """You are a helpful Discord bot. The user sent you a message in a DM, but you don't have channel context to answer from. Respond in a friendly, natural way. Keep it short and conversational. If they're greeting you or making small talk, reply in kind. If they seem to be asking about channel updates, gently say you need them to run /update first or subscribe to channels in a server."""
+        try:
+            client = _get_client()
+            response = client.chat(
+                model=model,
+                messages=[{"role": "user", "content": f"{prompt}\n\nUser message: {cleaned_question}"}],
+            )
+            answer = response.message.content
+            if answer and answer.strip():
+                return answer.strip()
+        except Exception as e:
+            logger.exception("ollama conversational reply failed", error=str(e))
+        return "Hi! I don't have any channel messages to answer from right now. Use /update in a server to fetch updates, or /subscribe to pick channels first."
 
     text = context_text
     if len(text) > MAX_CHARS:

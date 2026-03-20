@@ -273,8 +273,7 @@ async def ask_channel_question(interaction: discord.Interaction, question: str) 
         update_checkpoints=False,
     )
     answer = answer_question(context, question)
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    payload = f"**Answer** ({stamp})\n\n**Question:** {question}\n\n{answer}"
+    payload = answer
     await _send_followup_chunks(interaction, payload, ephemeral=True)
     logger.info("question answered", user_id=user.id, guild_id=guild.id if guild else None)
 
@@ -307,8 +306,7 @@ async def on_message(message: discord.Message) -> None:
         update_checkpoints=False,
     )
     answer = answer_question(context, content)
-    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    payload = f"**Answer** ({stamp})\n\n**Question:** {content}\n\n{answer}"
+    payload = answer
 
     chunk_size = 1800
     if len(payload) <= chunk_size:
